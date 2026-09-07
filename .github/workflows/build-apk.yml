@@ -1,0 +1,86 @@
+name: Build PlayBeat APK (Android)
+
+# Builds a signed release APK and publishes it to a GitHub Release with a
+# FIXED asset name (PlayBeat.apk) so the storefront can always link:
+#   https://github.com/uzzirulzz-cyber/Playbeat-Digital-apk/releases/latest/download/PlayBeat.apk
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "**.md"
+      - "public/**"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: JDK 21 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Gradle 9.3.1
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "9.3.1"
+
+      - name: Restore release keystore (stable signing across builds)
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          set -e
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > my-upload-key.jks
+            echo "Keystore restored from repo secret — signatures stay stable."
+          else
+            echo "::warning::KEYSTORE_BASE64 secret missing — generating an EPHEMERAL key. APKs from different builds will not install over each other!"
+            keytool -genkeypair -v -keystore my-upload-key.jks -alias upload \
+              -keyalg RSA -keysize 2048 -validity 10000 \
+              -storepass "${STORE_PASSWORD:-playbeat}" -keypass "${KEY_PASSWORD:-playbeat}" \
+              -dname "CN=PlayBeat Digital, OU=Mobile, O=PlayBeat Digital, L=Karachi, C=PK"
+          fi
+
+      - name: Build signed release APK
+        env:
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: gradle assembleRelease --no-daemon --stacktrace
+
+      - name: Normalize artifact name
+        run: |
+          cp app/build/outputs/apk/release/app-release.apk PlayBeat.apk
+          ls -la PlayBeat.apk
+          sha256sum PlayBeat.apk | tee PlayBeat.apk.sha256
+
+      - name: Publish to GitHub Release (v1.0.0)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.0
+          name: PlayBeat Digital — Android v1.0.0
+          body: |
+            PlayBeat Digital Android app — signed release build.
+
+            **Install:** download `PlayBeat.apk`, open it, allow "Install unknown apps" when Android asks, done.
+
+            - Version 1.0.0 (versionCode 1)
+            - Min Android 7.0 (API 24) · Target Android 16 (API 36)
+            - Same backend & account as https://playbeat.digital
+          files: |
+            PlayBeat.apk
+            PlayBeat.apk.sha256
+          fail_on_unmatched_files: true
+          overwrite: true
+          make_latest: true
