@@ -1,0 +1,6 @@
+{
+  "name": "Playbeat Digital",
+  "description": "Connected Playbeat Digital app featuring live product catalog, prices, and admin console responding to playbeat.digital and playbeat.digital/admin with instant key delivery.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
