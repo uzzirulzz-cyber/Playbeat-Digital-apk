@@ -4,6 +4,9 @@ on:
     branches: [kbt-operations-android]
     paths: ['kbt-operations/**', '.github/workflows/kbt-operations.yml']
   workflow_dispatch:
+concurrency:
+  group: kbt-operations-preview-release
+  cancel-in-progress: true
 permissions:
   contents: write
 jobs:
@@ -41,7 +44,7 @@ jobs:
       - name: Publish downloadable preview APK
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: kbt-operations-preview-v1
+          tag_name: kbt-operations-preview-v2
           name: KBT Operations — Android preview v1
           prerelease: true
           files: kbt-operations/KBT-Operations.apk
